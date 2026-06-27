@@ -1,0 +1,18 @@
+# colcon build artifacts - never commit these
+build/
+install/
+log/
+
+# C/C++ build junk
+*.o
+*.so
+*.a
+*.out
+
+# editor / OS files
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
