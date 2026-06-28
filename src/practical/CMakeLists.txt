@@ -8,7 +8,7 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(std-msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(std_msgs REQUIRED)        
 find_package(geometry_msgs REQUIRED)
 find_package(turtlesim REQUIRED)
@@ -22,6 +22,10 @@ install(TARGETS
   DESTINATION lib/${PROJECT_NAME})
 
 # install launch files so `ros2 launch practical <file>` can find them
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME})
+
 install(DIRECTORY
   launch
   DESTINATION share/${PROJECT_NAME})
