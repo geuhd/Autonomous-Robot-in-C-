@@ -24,13 +24,16 @@ add_executable(tf_luna_publisher src/tf_luna_publisher.cpp)
 # Link the ROS 2 dependencies to the executable
 ament_target_dependencies(tf_luna_publisher rclcpp sensor_msgs)
 
-# Install the executable so ROS 2 can find it
+add_executable(imu_publisher src/imu_publisher.cpp)
+ament_target_dependencies(imu_publisher rclcpp sensor_msgs)
+target_link_libraries(imu_publisher rgpio)
+
+# Install all the executables so ROS 2 can find them
 install(TARGETS
-  tf_luna_publisher
-  DESTINATION lib/${PROJECT_NAME}
-)
-install(TARGETS
+  simple_diff_drive
   tick_publisher
+  imu_publisher
+  tf_luna_publisher
   DESTINATION lib/${PROJECT_NAME})
   
 if(BUILD_TESTING)
