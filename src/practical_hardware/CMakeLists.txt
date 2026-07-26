@@ -10,6 +10,8 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+
 
 include_directories(/usr/local/include)
 link_directories(/usr/local/lib)
@@ -18,6 +20,15 @@ add_executable(tick_publisher src/tick_publisher.cpp)
 ament_target_dependencies(tick_publisher rclcpp std_msgs)
 target_link_libraries(tick_publisher rgpio)
 
+add_executable(tf_luna_publisher src/tf_luna_publisher.cpp)
+# Link the ROS 2 dependencies to the executable
+ament_target_dependencies(tf_luna_publisher rclcpp sensor_msgs)
+
+# Install the executable so ROS 2 can find it
+install(TARGETS
+  tf_luna_publisher
+  DESTINATION lib/${PROJECT_NAME}
+)
 install(TARGETS
   tick_publisher
   DESTINATION lib/${PROJECT_NAME})
