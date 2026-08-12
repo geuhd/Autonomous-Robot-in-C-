@@ -1,0 +1,69 @@
+# =============================================================================
+#  costmap_basic.yaml  --  ROS 2 (Jazzy) / nav2_costmap_2d
+#  "Practical Robotics in C++", Chapter 13
+# -----------------------------------------------------------------------------
+#  ROS 2 replacement for the book's ROS 1 costmap_2d YAML.
+#  Key differences from the book:
+#    * package is nav2_costmap_2d (not costmap_2d); plugin types gain the nav2_ prefix
+#    * parameters live under the node name + `ros__parameters:`
+#    * `plugins:` is a plain list of names; each layer is then configured by name
+#    * footprint can be given as `robot_radius` (circular) or `footprint` (polygon)
+#
+#  Run the standalone costmap node with:
+#    ros2 run nav2_costmap_2d nav2_costmap_2d --ros-args --params-file costmap_basic.yaml
+#
+#  Docs: https://docs.nav2.org/configuration/packages/configuring-costmaps.html
+# =============================================================================
+
+costmap:
+  costmap:
+    ros__parameters:
+      update_frequency: 1.0
+      publish_frequency: 1.0
+      global_frame: map
+      robot_base_frame: base_link
+      use_sim_time: False
+
+      # --- robot shape -------------------------------------------------------
+      # Circular robot: just give the radius (metres). This is the simple case.
+      robot_radius: 0.5
+      # For a non-circular robot, comment out robot_radius and use a polygon
+      # (the book's 8-point octagon equivalent), (0,0) is the robot centre:
+      # footprint: "[[0.25,0.1],[0.1,0.25],[-0.1,0.25],[-0.25,0.1],
+      #              [-0.25,-0.1],[-0.1,-0.25],[0.1,-0.25],[0.25,-0.1]]"
+
+      # --- map -------------------------------------------------------------
+      resolution: 0.1              # metres per cell (the book's `delta`)
+      track_unknown_space: true
+      always_send_full_costmap: True
+
+      # --- layers (the book's `plugins:` list) --------------------------------
+      plugins: ["static_layer", "inflation_layer"]
+
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_topic: /map
+        map_subscribe_transient_local: True
+        # book equivalents: unknown_cost_value, lethal_cost_threshold
+        unknown_cost_value: -1
+        lethal_cost_threshold: 100
+
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        # how far obstacle cost spreads out (this is the "obstacle inflation"
+        # the chapter is about) -- set to at least the robot radius
+        inflation_radius: 0.55
+        # how quickly cost decays with distance from the obstacle
+        cost_scaling_factor: 3.0
+
+      # To also react to live sensor data, add "obstacle_layer" to the plugins
+      # list above and configure it here:
+      # obstacle_layer:
+      #   plugin: "nav2_costmap_2d::ObstacleLayer"
+      #   enabled: True
+      #   observation_sources: scan
+      #   scan:
+      #     topic: /scan
+      #     data_type: "LaserScan"
+      #     clearing: True
+      #     marking: True

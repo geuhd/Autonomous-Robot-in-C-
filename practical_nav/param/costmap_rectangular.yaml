@@ -1,0 +1,81 @@
+# =============================================================================
+#  costmap_rectangular.yaml  --  ROS 2 (Jazzy) / nav2_costmap_2d
+#  Costmap config for a RECTANGULAR robot
+#  "Practical Robotics in C++", Chapter 13
+# -----------------------------------------------------------------------------
+#  WORKED EXAMPLE for a robot 0.40 m long (x) by 0.30 m wide (y),
+#  with base_link at the geometric centre.
+#
+#    half-length (x) = 0.40 / 2 = 0.20
+#    half-width  (y) = 0.30 / 2 = 0.15
+#
+#    corners, traced around the rectangle:
+#      front-left  ( 0.20,  0.15)
+#      front-right ( 0.20, -0.15)
+#      rear-right  (-0.20, -0.15)
+#      rear-left   (-0.20,  0.15)
+#
+#    circumscribed radius = sqrt(0.20^2 + 0.15^2) = 0.25 m
+#    -> inflation_radius must be AT LEAST 0.25; use a margin, so 0.30
+#
+#  EDIT the footprint and inflation_radius to match YOUR measured robot.
+#
+#  Run standalone:
+#    ros2 run nav2_costmap_2d nav2_costmap_2d \
+#      --ros-args --params-file costmap_rectangular.yaml
+#
+#  Docs: https://docs.nav2.org/configuration/packages/configuring-costmaps.html
+# =============================================================================
+
+costmap:
+  costmap:
+    ros__parameters:
+      update_frequency: 1.0
+      publish_frequency: 1.0
+      global_frame: map
+      robot_base_frame: base_link
+      use_sim_time: False
+
+      # --- RECTANGULAR ROBOT FOOTPRINT ---------------------------------------
+      # Points are [x, y] in metres, relative to base_link at (0,0).
+      # +x = forward, +y = left. List them in order around the polygon;
+      # the last point auto-connects back to the first.
+      # NOTE: given as a STRING in ROS 2 YAML (the quotes matter).
+      footprint: "[[0.20, 0.15], [0.20, -0.15], [-0.20, -0.15], [-0.20, 0.15]]"
+      # Do NOT also set robot_radius -- use footprint OR robot_radius, not both.
+
+      # --- map ---------------------------------------------------------------
+      resolution: 0.1              # metres per cell
+      track_unknown_space: true
+      always_send_full_costmap: True
+
+      # --- layers -------------------------------------------------------------
+      plugins: ["static_layer", "inflation_layer"]
+
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_topic: /map
+        map_subscribe_transient_local: True
+        unknown_cost_value: -1
+        lethal_cost_threshold: 100
+
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        # Must be >= the circumscribed radius (half the diagonal = 0.25 here).
+        # Bigger = more clearance but the robot may refuse tight gaps.
+        inflation_radius: 0.30
+        # How fast cost falls off with distance from an obstacle.
+        # Higher = tighter hugging of the inflation edge; 3.0 is a good start.
+        cost_scaling_factor: 3.0
+
+      # --- optional: react to live sensor data --------------------------------
+      # Add "obstacle_layer" to the plugins list above to enable this.
+      # obstacle_layer:
+      #   plugin: "nav2_costmap_2d::ObstacleLayer"
+      #   enabled: True
+      #   observation_sources: scan
+      #   scan:
+      #     topic: /scan
+      #     data_type: "LaserScan"
+      #     marking: True
+      #     clearing: True
