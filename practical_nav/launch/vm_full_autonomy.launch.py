@@ -4,24 +4,22 @@ from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
-# Chapter 21, step 8.2: basic_full.launch
-# Full autonomy: serves the saved map, locks map -> odom together (we're not
-# running SLAM here, so nothing else publishes that transform -- see the
-# book's own note that gmapping normally provides it), runs the costmap and
-# the A* path planner, and drives to whatever goal_2d receives.
+# Runs ON THE PC/VM. Pairs with pi_hardware.launch.py running on the Pi
+# (which handles the base_link -> laser transform, encoders, motor control,
+# IMU, and the LIDAR itself).
 #
-# ROS 1 -> ROS 2 differences worth knowing before you run this:
-#   * map_server and nav2_costmap_2d are both LIFECYCLE nodes in ROS 2 -- they
-#     start up "unconfigured" and need a lifecycle_manager to bring them to
-#     "active", unlike ROS 1's map_server which just ran.
-#   * nav2_costmap_2d publishes its costmap under <name>/costmap/costmap, not
-#     the bare "costmap" topic the ROS 1 costmap_2d package used -- hence the
-#     remap on path_planner below.
-#   * manual_pose_and_goal_pub is NOT included here (too much terminal output
-#     mixed with everything else per the book) -- run it in its own terminal,
-#     or use RViz's own goal tool once you've bridged it to goal_2d.
+# VM side of the old "basic_full" step: full autonomy. Serves the saved map,
+# locks map -> odom together (nothing else is publishing that transform since
+# we're not running SLAM live during an autonomous run), runs the costmap and
+# A* path planner, and drives to whatever goal_2d receives.
 #
-# ros2 launch practical_nav basic_full.launch.py map_file:=/path/to/myFirstMap.yaml
+# Why this split makes sense: map_server, costmap, and the path planner are
+# all CPU-hungry compared to the simple GPIO/I2C reads the Pi is doing, and
+# none of them touch hardware -- ROS 2's DDS discovery means they don't need
+# to be on the same machine as the sensors they're consuming, unlike ROS 1's
+# single-roscore model.
+#
+# ros2 launch practical_nav vm_full_autonomy.launch.py map_file:=/path/to/myFirstMap.yaml
 
 def generate_launch_description():
     map_file_arg = DeclareLaunchArgument(
@@ -38,16 +36,6 @@ def generate_launch_description():
     return LaunchDescription([
         map_file_arg,
 
-        Node(
-            package="tf2_ros",
-            executable="static_transform_publisher",
-            name="base_link_to_laser",
-            arguments=[
-                "--x", ".1", "--y", "0", "--z", "0",
-                "--roll", "0", "--pitch", "3.1415", "--yaw", "3.1415",
-                "--frame-id", "base_link", "--child-frame-id", "laser",
-            ],
-        ),
         # locks map and odom together since nothing else (no SLAM node) is
         # running to publish this transform for us
         Node(
@@ -62,30 +50,11 @@ def generate_launch_description():
         ),
 
         Node(
-            package="practical_hardware",
-            executable="tick_publisher",
-            name="tick_publisher",
-            output="screen",
-        ),
-        Node(
-            package="practical",
-            executable="simple_diff_drive",
-            name="simple_diff_drive",
-            output="screen",
-        ),
-        Node(
-            package="practical_hardware",
-            executable="imu_publisher",
-            name="imu_publisher",
-            output="screen",
-        ),
-        Node(
             package="practical_localization",
             executable="odom_publisher",
             name="odom_publisher",
             output="screen",
         ),
-        # TODO: add your LIDAR driver node here (e.g. sllidar_ros2).
 
         # map_server: lifecycle node, needs a lifecycle_manager to activate it
         Node(
@@ -130,9 +99,8 @@ def generate_launch_description():
             output="screen",
             remappings=[("costmap", "/costmap/costmap")],
         ),
-        # no remap here (unlike basic_manual_waypoint.launch.py) -- this time
-        # simple_drive_controller listens on the real "waypoint_2d" the path
-        # planner publishes
+        # no remap here -- simple_drive_controller listens on the real
+        # "waypoint_2d" the path planner publishes
         Node(
             package="practical",
             executable="simple_drive_controller",
