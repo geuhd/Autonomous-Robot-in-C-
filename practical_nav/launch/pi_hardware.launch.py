@@ -1,6 +1,9 @@
+import os
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, TimerAction
+from launch.actions import ExecuteProcess, TimerAction, IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
+from ament_index_python.packages import get_package_share_directory
 
 # Runs ON THE PI. Everything here talks directly to hardware (GPIO/I2C/serial/
 # USB), which is exactly the stuff that has to run on the robot itself.
@@ -29,19 +32,19 @@ from launch_ros.actions import Node
 # ros2 launch practical_nav pi_hardware.launch.py
 
 def generate_launch_description():
-    # base_link -> laser static transform: physical mount, lives with the
-    # hardware side regardless of which machine is doing the SLAM/nav math.
-    # EDIT to match how your LIDAR is actually mounted.
-    static_tf = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="base_link_to_laser",
-        arguments=[
-            "--x", ".1", "--y", "0", "--z", "0",
-            "--roll", "0", "--pitch", "3.1415", "--yaw", "3.1415",
-            "--frame-id", "base_link", "--child-frame-id", "laser",
-        ],
-    )
+    # NOTE: there is deliberately no custom base_link -> laser static
+    # transform here anymore. ldlidar_ros2's own ld19.launch.py (included
+    # below) already publishes base_link -> base_laser itself (confirmed by
+    # its own log output: "Spinning until stopped - publishing transform...
+    # from 'base_link' to 'base_laser'"), which is the frame_id its
+    # LaserScan messages actually use. A second, separately-defined
+    # transform to a "laser" frame that nothing else references would just
+    # be dead weight -- slam_toolbox reads the frame_id straight off the
+    # incoming scan message and looks up whatever transform already
+    # connects it to base_link, so the driver's own transform is sufficient.
+    # If you re-mount the LIDAR differently than its default (translation
+    # 0, 0, 0.18, no rotation), edit ldlidar_ros2's own launch file/params
+    # rather than adding a second, conflicting transform here.
 
     tick_publisher = Node(
         package="practical_hardware",
@@ -64,17 +67,22 @@ def generate_launch_description():
         output="screen",
     )
 
-    # TODO: swap this in for your actual ldlidar_ros2 node -- package,
-    # executable, and any params/remaps (topic/frame_id) depend on which
-    # LD-Robot LIDAR model + driver fork you installed. Tell me what
-    # `find ~/ros2_ws/src/ldlidar_ros2 -name "*.launch.py"` and its
-    # package.xml <name> show and I'll fill this in for real.
-    # lidar_driver = Node(
-    #     package="ldlidar_ros2",
-    #     executable="ldlidar_publisher",
-    #     name="ldlidar_publisher",
-    #     output="screen",
-    # )
+    # LDROBOT D500 (STL-19P) via the ldrobotSensorTeam/ldlidar_ros2 package.
+    # Rather than reimplement its Node() call here (and risk getting the
+    # internal executable name/params wrong), we just include the driver's
+    # own launch file -- it's the maintained, known-good way to start it.
+    # EDIT the port if `ls /dev/ttyUSB*` shows something other than
+    # /dev/ttyUSB0 -- either edit it here via launch_arguments, or edit
+    # port_name directly in ldlidar_ros2's own ld19.launch.py.
+    lidar_driver = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(
+                get_package_share_directory("ldlidar_ros2"),
+                "launch",
+                "ld19.launch.py",
+            )
+        ),
+    )
 
     return LaunchDescription([
         # start the rgpiod daemon first...
@@ -89,11 +97,10 @@ def generate_launch_description():
         TimerAction(
             period=2.0,
             actions=[
-                static_tf,
                 tick_publisher,
                 simple_diff_drive,
                 imu_publisher,
-                # lidar_driver,
+                lidar_driver,
             ],
         ),
     ])
