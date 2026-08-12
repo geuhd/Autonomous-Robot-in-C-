@@ -23,7 +23,7 @@ add_executable(go_to_x src/go_to_x.cpp)
 ament_target_dependencies(go_to_x rclcpp geometry_msgs turtlesim)
 
 # --- Motor controller: needs GPIO, so it links rgpio ---
-add_executable(simple_diff_drive src/simple_diff_drive.cpp)
+add_executable(simple_diff_drive src/simple_diff.cpp)
 ament_target_dependencies(simple_diff_drive rclcpp std_msgs geometry_msgs)
 target_link_libraries(simple_diff_drive rgpio)
 
