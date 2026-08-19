@@ -13,7 +13,7 @@ using namespace std;
 const int PWM_INCREMENT = 2;
 const double TICKS_PER_M = 2250;
 const int MIN_PWM = 55;
-const int MAX_PWM =120;
+const int MAX_PWM =200;
 const float PWM_FREQ = 1000; //THIS IS NEEDED AS THE NEW LIBRARY USES A STATED VALUE INSTEAD OF THE OD ONE THAT WOUDL USE A DEFAULT VALUE
 
 //left and right motors and their direction pin assignment
@@ -114,8 +114,8 @@ void Set_Speeds(const geometry_msgs::msg::Twist & cmdVel)
         prevDiff = angularVelDiff;
 
         //here we  are applying correction so the wheels can continue to go straight
-        leftPWMReq -= (int)(avgAngularDiff*125);
-        rightPWMReq += (int)(avgAngularDiff*125);
+        //leftPWMReq -= (int)(avgAngularDiff*125);
+        //rightPWMReq += (int)(avgAngularDiff*125);
     }
     else {leftPWMReq = 0; rightPWMReq = 0;}
 
