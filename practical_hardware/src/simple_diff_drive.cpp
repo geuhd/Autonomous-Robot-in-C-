@@ -1,6 +1,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "std_msgs/msg/int16.hpp"
+#include "std_msgs/msg/bool.hpp"
 #include <cmath>
 #include <iostream>
 #include <rgpio.h>
@@ -33,6 +34,10 @@ double leftPWMReq =0;
 double rightPWMReq = 0;
 double lastCmdMsgRcvd =0;
 
+//the direction each wheel is being driven, sent to tick_publisher
+bool leftReversing = false;
+bool rightReversing = false;
+
 
 // rgpio needs TWO handles: sbc = daemon connection, h = gpiochip
 int sbc = -1;
@@ -44,6 +49,9 @@ int h = -1;
 //So any function that reads the clock must be able to reach the node.
 
 rclcpp::Node::SharedPtr node;
+
+rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pubLeftDir;
+rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pubRightDir;
 
 //calculate the velocity of the left wheel
 void Calc_Left_Vel(const std_msgs::msg::Int16 & lCount)
@@ -57,7 +65,8 @@ void Calc_Left_Vel(const std_msgs::msg::Int16 & lCount)
     if (cycleDistance >10000)
         cycleDistance = 0 - (65535 -cycleDistance);
 
-    leftVelocity = cycleDistance/TICKS_PER_M/(node->now().seconds() - lastTime);
+    double dt = node->now().seconds() - lastTime;
+    if(dt >1e-6) leftVelocity = cycleDistance/TICKS_PER_M/dt;
     lastCount =lCount.data;
     lastTime= node->now().seconds();
 
@@ -75,7 +84,8 @@ void Calc_Right_Vel(const std_msgs::msg::Int16 & rCount)
     if (cycleDistance >10000)
         cycleDistance = 0 - (65535 -cycleDistance);
 
-    rightVelocity = cycleDistance/TICKS_PER_M/(node->now().seconds() - lastTime);
+    double dt = node->now().seconds() - lastTime;
+    if(dt >1e-6) rightVelocity = cycleDistance/TICKS_PER_M/dt;
     lastCount =rCount.data;
     lastTime= node->now().seconds();
 
@@ -86,10 +96,10 @@ void Set_Speeds(const geometry_msgs::msg::Twist & cmdVel)
 {
     lastCmdMsgRcvd = node->now().seconds();
 
-    if(cmdVel.angular.z>.10){leftPWMReq = -55; rightPWMReq =55;} // turn left
-    else if (cmdVel.angular.z < -.10){leftPWMReq = 55; rightPWMReq = -55;} // turn right
+    if(cmdVel.angular.z>.10){leftPWMReq = -70; rightPWMReq =70;} // turn left
+    else if (cmdVel.angular.z < -.10){leftPWMReq = 70; rightPWMReq = -70;} // turn right
 
-    else if (fabs(cmdVel.linear.x)>50)
+    else if (fabs(cmdVel.linear.x)>0.01)
     {
         leftPWMReq = 230 * cmdVel.linear.x + 39;
         rightPWMReq = 230 * cmdVel.linear.x + 39;
@@ -107,9 +117,11 @@ void Set_Speeds(const geometry_msgs::msg::Twist & cmdVel)
         leftPWMReq -= (int)(avgAngularDiff*125);
         rightPWMReq += (int)(avgAngularDiff*125);
     }
+    else {leftPWMReq = 0; rightPWMReq = 0;}
+
     // for the values that do not cause the robot to move we should set these to 0
-    leftPWMReq = (fabs(leftPWMReq)<= MIN_PWM) ? 0 : leftPWMReq;
-    rightPWMReq =(fabs(rightPWMReq)<= MIN_PWM) ? 0 : rightPWMReq;
+    leftPWMReq = (fabs(leftPWMReq)< MIN_PWM) ? 0 : leftPWMReq;
+    rightPWMReq =(fabs(rightPWMReq)< MIN_PWM) ? 0 : rightPWMReq;
 }
 
 // This functions set the values we calcuated in the previous function to the GPIO pins
@@ -121,8 +133,8 @@ void set_pin_values()
 
     //rgpio  uses gpio_write(sbc,h,PIN,val) 
     // the h is the handle  
-    if(leftPWMReq >0) {gpio_write(sbc,h,MOTOR_L_REV,1); gpio_write(sbc,h,MOTOR_L_FWD,0);}   // LEFT forwad
-    else if (leftPWMReq<0){gpio_write(sbc,h,MOTOR_L_FWD,1); gpio_write(sbc,h,MOTOR_L_REV,0);}   //LEFT MOTOR REVESE
+    if(leftPWMReq >0) {gpio_write(sbc,h,MOTOR_L_REV,1); gpio_write(sbc,h,MOTOR_L_FWD,0); leftReversing = false;}   // LEFT forwad
+    else if (leftPWMReq<0){gpio_write(sbc,h,MOTOR_L_FWD,1); gpio_write(sbc,h,MOTOR_L_REV,0); leftReversing = true;}   //LEFT MOTOR REVESE
     else if (leftPWMReq ==0 && leftPwmOut ==0) {gpio_write(sbc,h,MOTOR_L_FWD,1); gpio_write(sbc,h,MOTOR_L_REV,1);}//LEFT 
     
     //sending our PWM signal
@@ -137,8 +149,8 @@ void set_pin_values()
     tx_pwm(sbc,h,PWM_L,PWM_FREQ,leftPwmOut/255.0f*100.0f,0,0);
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //same steps but for the right motor 
-    if(rightPWMReq >0) {gpio_write(sbc,h,MOTOR_R_REV,1); gpio_write(sbc,h,MOTOR_R_FWD,0);}   // LEFT forwad
-    else if (rightPWMReq<0){gpio_write(sbc,h,MOTOR_R_FWD,1); gpio_write(sbc,h,MOTOR_R_REV,0);}   //LEFT MOTOR REVESE
+    if(rightPWMReq >0) {gpio_write(sbc,h,MOTOR_R_REV,1); gpio_write(sbc,h,MOTOR_R_FWD,0); rightReversing = false;}   // LEFT forwad
+    else if (rightPWMReq<0){gpio_write(sbc,h,MOTOR_R_FWD,1); gpio_write(sbc,h,MOTOR_R_REV,0); rightReversing = true;}   //LEFT MOTOR REVESE
     else if (rightPWMReq ==0 && rightPwmOut ==0) {gpio_write(sbc,h,MOTOR_R_FWD,1); gpio_write(sbc,h,MOTOR_R_REV,1);}//LEFT 
     
     //sending our PWM signal
@@ -152,6 +164,12 @@ void set_pin_values()
     //for rgpio we should use tx_pwm // tx_pwm(sbc,h,PWM_L,PWM_FREQ,XXXX)
     tx_pwm(sbc,h,PWM_R,PWM_FREQ,rightPwmOut/255.0f*100.0f,0,0);
 
+    //tell tick_publisher which way we are driving instead of it reading our pins
+    std_msgs::msg::Bool leftDir; leftDir.data = leftReversing;
+    std_msgs::msg::Bool rightDir; rightDir.data = rightReversing;
+    pubLeftDir->publish(leftDir);
+    pubRightDir->publish(rightDir);
+
 }
 // This section is dedicated to the GPIO set up using rgpio
 int GpioSetup()
@@ -163,12 +181,17 @@ int GpioSetup()
 
     //set the pin modes for the gpio pins
     //rgpio:: gpio_clain_output(sbc,h,flags,PIN, initalValue)
-    gpio_claim_output(sbc,h,0,PWM_L,0);
-    gpio_claim_output(sbc,h,0,MOTOR_L_FWD,1);
-    gpio_claim_output(sbc,h,0,MOTOR_L_REV,1);
-    gpio_claim_output(sbc,h,0,PWM_R,0);
-    gpio_claim_output(sbc,h,0,MOTOR_R_FWD,1);
-    gpio_claim_output(sbc,h,0,MOTOR_R_REV,1);
+    //a line already claimed by another process returns an error here, so check it
+    if(gpio_claim_output(sbc,h,0,PWM_L,0)<0){cout<<"Failed to claim GPIO "<<PWM_L<<endl; return -1;}
+    if(gpio_claim_output(sbc,h,0,MOTOR_L_FWD,1)<0){cout<<"Failed to claim GPIO "<<MOTOR_L_FWD<<endl; return -1;}
+    if(gpio_claim_output(sbc,h,0,MOTOR_L_REV,1)<0){cout<<"Failed to claim GPIO "<<MOTOR_L_REV<<endl; return -1;}
+    if(gpio_claim_output(sbc,h,0,PWM_R,0)<0){cout<<"Failed to claim GPIO "<<PWM_R<<endl; return -1;}
+    if(gpio_claim_output(sbc,h,0,MOTOR_R_FWD,1)<0){cout<<"Failed to claim GPIO "<<MOTOR_R_FWD<<endl; return -1;}
+    if(gpio_claim_output(sbc,h,0,MOTOR_R_REV,1)<0){cout<<"Failed to claim GPIO "<<MOTOR_R_REV<<endl; return -1;}
+
+    //make sure both channels are off before anything else happens
+    tx_pwm(sbc,h,PWM_L,PWM_FREQ,0,0,0);
+    tx_pwm(sbc,h,PWM_R,PWM_FREQ,0,0,0);
 
     return sbc;
 
@@ -177,17 +200,20 @@ int GpioSetup()
 //main function of the node 
 int main(int argc, char **argv)
 {
+    rclcpp::init(argc,argv);
+    node = rclcpp::Node::make_shared("simple_diff_drive");
+
     sbc = GpioSetup();
     if(sbc>=0 && h>=0){ cout<<"rgpio interface started ok, sbc = "<<sbc<<endl;}
     else { cout<<"Failed to connect to rgpiod Daemon - is it running? (sudo rgpiod)"<<endl; return -1;}
     
 
-    rclcpp::init(argc,argv);
-    node = rclcpp::Node::make_shared("simple_diff_drive");
-
     auto subRCounts = node->create_subscription<std_msgs::msg::Int16>("rightWheel",10,Calc_Right_Vel);
     auto subLCounts = node->create_subscription<std_msgs::msg::Int16>("leftWheel",10,Calc_Left_Vel);
     auto subVelocity = node->create_subscription<geometry_msgs::msg::Twist>("cmd_vel",10,Set_Speeds);
+
+    pubLeftDir = node->create_publisher<std_msgs::msg::Bool>("left_reversing",10);
+    pubRightDir = node->create_publisher<std_msgs::msg::Bool>("right_reversing",10);
 
     rclcpp::Rate loop_rate(50);
     while(rclcpp::ok())
@@ -202,6 +228,9 @@ int main(int argc, char **argv)
         set_pin_values();
         loop_rate.sleep();
     }
+    tx_pwm(sbc,h,PWM_L,PWM_FREQ,0,0,0);
+    tx_pwm(sbc,h,PWM_R,PWM_FREQ,0,0,0);
+
     gpio_write(sbc,h,MOTOR_L_FWD,1);
     gpio_write(sbc,h,MOTOR_L_REV,1);
     gpio_write(sbc,h,MOTOR_R_FWD,1);

@@ -54,7 +54,7 @@ def generate_launch_description():
     )
 
     simple_diff_drive = Node(
-        package="practical",
+        package="practical_hardware",
         executable="simple_diff_drive",
         name="simple_diff_drive",
         output="screen",

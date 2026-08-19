@@ -22,10 +22,6 @@ link_directories(/usr/local/lib)
 add_executable(go_to_x src/go_to_x.cpp)
 ament_target_dependencies(go_to_x rclcpp geometry_msgs turtlesim)
 
-# --- Motor controller: needs GPIO, so it links rgpio ---
-add_executable(simple_diff_drive src/simple_diff.cpp)
-ament_target_dependencies(simple_diff_drive rclcpp std_msgs geometry_msgs)
-target_link_libraries(simple_diff_drive rgpio)
 
 # --- Drive controller: pure ROS 2, no GPIO ---
 add_executable(simple_drive_controller src/simple_drive_controller.cpp)
@@ -34,7 +30,6 @@ ament_target_dependencies(simple_drive_controller rclcpp geometry_msgs nav_msgs)
 # install the executables so `ros2 run practical <node>` can find them
 install(TARGETS
   go_to_x
-  simple_diff_drive
   simple_drive_controller
   DESTINATION lib/${PROJECT_NAME})
 
