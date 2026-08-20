@@ -12,8 +12,8 @@ using namespace std;
 
 const int PWM_INCREMENT = 2;
 const double TICKS_PER_M = 2250;
-const int MIN_PWM = 55;
-const int MAX_PWM =200;
+const int MIN_PWM = 55;200
+const int MAX_PWM =255;
 const float PWM_FREQ = 1000; //THIS IS NEEDED AS THE NEW LIBRARY USES A STATED VALUE INSTEAD OF THE OD ONE THAT WOUDL USE A DEFAULT VALUE
 
 //left and right motors and their direction pin assignment
@@ -36,7 +36,7 @@ double lastCmdMsgRcvd =0;
 
 //the direction each wheel is being driven, sent to tick_publisher
 bool leftReversing = false;
-bool rightReversing = false;
+bool rightReversing = false;200
 
 
 // rgpio needs TWO handles: sbc = daemon connection, h = gpiochip
@@ -101,8 +101,8 @@ void Set_Speeds(const geometry_msgs::msg::Twist & cmdVel)
 
     else if (fabs(cmdVel.linear.x)>0.01)
     {
-        leftPWMReq = 230 * cmdVel.linear.x + 39;
-        rightPWMReq = 230 * cmdVel.linear.x + 39;
+        leftPWMReq = 400 * cmdVel.linear.x + 60;
+        rightPWMReq = 400 * cmdVel.linear.x + 60;
 
         //average difference in the wheel speed of the last 3 cycles
         double angularVelDiff = leftVelocity - rightVelocity;
