@@ -96,13 +96,13 @@ void Set_Speeds(const geometry_msgs::msg::Twist & cmdVel)
 {
     lastCmdMsgRcvd = node->now().seconds();
 
-    if(cmdVel.angular.z>.10){leftPWMReq = -70; rightPWMReq =70;} // turn left
-    else if (cmdVel.angular.z < -.10){leftPWMReq = 70; rightPWMReq = -70;} // turn right
+    if(cmdVel.angular.z>.10){leftPWMReq = -(65 * fabs(cmdVel.angular.z) + 55); rightPWMReq = 65 * fabs(cmdVel.angular.z) + 55;} // turn left
+    else if (cmdVel.angular.z < -.10){leftPWMReq = 65 * fabs(cmdVel.angular.z) + 55; rightPWMReq = -(65 * fabs(cmdVel.angular.z) + 55);} // turn right
 
     else if (fabs(cmdVel.linear.x)>0.01)
     {
-        leftPWMReq = 400 * cmdVel.linear.x + 60;
-        rightPWMReq = 400 * cmdVel.linear.x + 60;
+        leftPWMReq = 200 * cmdVel.linear.x + 55;
+        rightPWMReq = 200 * cmdVel.linear.x + 55;
 
         //average difference in the wheel speed of the last 3 cycles
         double angularVelDiff = leftVelocity - rightVelocity;
